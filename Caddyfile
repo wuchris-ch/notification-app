@@ -1,0 +1,32 @@
+{
+  # For local/LAN dev. When you add a real domain later, switch to automatic TLS.
+  # local_certs  # (uncomment if you want Caddy's local CA + HTTPS)
+}
+
+:80 {
+  handle_path /api/* {
+    reverse_proxy api:8000
+  }
+
+  handle /openapi.json {
+    reverse_proxy api:8000
+  }
+
+  handle /docs* {
+    reverse_proxy api:8000
+  }
+
+  handle /redoc* {
+    reverse_proxy api:8000
+  }
+
+  # ntfy passthrough at /push
+  handle_path /push/* {
+    reverse_proxy ntfy:80
+  }
+
+  # everything else -> Next.js web
+  handle {
+    reverse_proxy web:3000
+  }
+}

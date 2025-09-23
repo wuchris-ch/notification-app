@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.env
+.env.*
+node_modules/
+web/.next/
+web/.turbo/
+web/node_modules/
+*.log
+.DS_Store

@@ -1,0 +1,83 @@
+version: "3.9"
+
+services:
+  proxy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - web
+      - api
+      - ntfy
+    environment:
+      - DOMAIN=${DOMAIN:-192.168.1.185}
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_BASE=/api
+      - NEXT_TELEMETRY_DISABLED=1
+    depends_on:
+      - api
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-America/Vancouver}
+      - DATABASE_URL=${DATABASE_URL}
+      - NTFY_BASE_URL=https://ntfy.sh
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      - db
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  scheduler:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-America/Vancouver}
+      - DATABASE_URL=${DATABASE_URL}
+      - NTFY_BASE_URL=https://ntfy.sh
+    depends_on:
+      - db
+      - ntfy
+    command: python scheduler_main.py
+
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - TZ=${TZ:-America/Vancouver}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  ntfy:
+    image: binwiederhier/ntfy:latest
+    restart: unless-stopped
+    command: serve --listen-http=0.0.0.0:80 --cache-file=/var/lib/ntfy/cache.db
+    environment:
+      - TZ=${TZ:-America/Vancouver}
+    volumes:
+      - ntfy-data:/var/lib/ntfy
+
+volumes:
+  db-data:
+  ntfy-data:
+  caddy-data:
+  caddy-config:
