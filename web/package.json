@@ -8,13 +8,15 @@
     "postinstall": "node -e \"\""
   },
   "dependencies": {
-    "class-variance-authority": "0.7.0",
-    "lucide-react": "0.451.0",
+    "@radix-ui/react-slot": "^1.2.3",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.451.0",
     "next": "14.2.15",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "tailwind-merge": "2.5.2",
-    "tailwindcss-animate": "1.0.7"
+    "tailwind-merge": "^2.5.2",
+    "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
     "@types/node": "20.16.5",

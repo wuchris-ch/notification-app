@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useState } from "react"
 import { remindersApi, usersApi, logsApi, alertChannelsApi, User, Reminder, DeliveryLog, AlertChannel } from "../../lib/api"
 
@@ -245,12 +246,12 @@ export default function Reminders() {
             >
               Refresh
             </button>
-            <a
+            <Link
               href="/new"
               className="px-4 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800"
             >
               New Reminder
-            </a>
+            </Link>
           </div>
         </div>
 
@@ -297,12 +298,12 @@ export default function Reminders() {
                 : `No reminders found for ${getUserName(selectedUserId as number)}.`
               }
             </p>
-            <a
+            <Link
               href="/new"
               className="mt-3 inline-block px-4 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800"
             >
               Create Reminder
-            </a>
+            </Link>
           </div>
         ) : (
           <div className="grid gap-4">

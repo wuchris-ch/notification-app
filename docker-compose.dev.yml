@@ -1,0 +1,15 @@
+version: "3.9"
+
+services:
+  web:
+    volumes:
+      # Mount source code for hot reloading
+      - ./web:/app
+      # Preserve node_modules and .next for performance
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_BASE=/api
+      - NEXT_TELEMETRY_DISABLED=1

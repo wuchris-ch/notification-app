@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { FormEvent, useEffect, useMemo, useState } from "react"
 
 import { apiUrl, remindersApi, alertChannelsApi, Reminder, AlertChannel } from "../../lib/api"
@@ -526,7 +527,7 @@ export default function NewReminder() {
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-slate-500">Need another person? <a className="underline" href="/users">Manage users</a>.</p>
+                <p className="text-xs text-slate-500">Need another person? <Link className="underline" href="/users">Manage users</Link>.</p>
               </label>
               <span className="text-sm text-slate-500">
                 {loadingUsers ? "Loading..." : hasUsers ? `${users.length} available` : "Add users first"}
@@ -557,7 +558,7 @@ export default function NewReminder() {
               </select>
               <p className="text-xs text-slate-500">
                 Choose an alert channel to send notifications to a shared topic instead of the user's personal topic. 
-                <a className="underline ml-1" href="/alert-channels">Manage channels</a>.
+                <Link className="underline ml-1" href="/alert-channels">Manage channels</Link>.
               </p>
             </div>
             {channelsError ? (
@@ -786,9 +787,9 @@ export default function NewReminder() {
             <h2 className="text-2xl font-semibold text-slate-900">Current Reminders</h2>
             <p className="text-sm text-slate-600">
               Recently created reminders. For full management, visit the{" "}
-              <a href="/reminders" className="underline text-blue-600 hover:text-blue-800">
+              <Link href="/reminders" className="underline text-blue-600 hover:text-blue-800">
                 reminders page
-              </a>.
+              </Link>.
             </p>
           </div>
           <button
@@ -857,12 +858,12 @@ export default function NewReminder() {
                     </div>
                     
                     <div className="mt-3 pt-2 border-t border-slate-200">
-                      <a 
-                        href="/reminders" 
+                      <Link
+                        href="/reminders"
                         className="text-xs text-blue-600 hover:text-blue-800"
                       >
                         Manage this reminder →
-                      </a>
+                      </Link>
                     </div>
                   </div>
                 ))}
@@ -870,12 +871,12 @@ export default function NewReminder() {
               
               {reminders.length > 6 && (
                 <div className="text-center pt-4">
-                  <a 
+                  <Link
                     href="/reminders"
                     className="inline-flex items-center justify-center rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-200"
                   >
                     View all {reminders.length} reminders
-                  </a>
+                  </Link>
                 </div>
               )}
             </div>
