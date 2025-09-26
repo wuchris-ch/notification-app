@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { FormEvent, useEffect, useMemo, useState } from "react"
 
-import { apiUrl, remindersApi, alertChannelsApi, Reminder, AlertChannel } from "../../lib/api"
+import { apiUrl, remindersApi, alertChannelsApi, aiRemindersApi, Reminder, AlertChannel, AIReminderParsed } from "../../lib/api"
 
 type User = {
   id: number
@@ -264,6 +264,13 @@ export default function NewReminder() {
   const [testError, setTestError] = useState<string | null>(null)
   const [testing, setTesting] = useState(false)
 
+  // AI-powered reminder states
+  const [useAI, setUseAI] = useState(false)
+  const [naturalLanguage, setNaturalLanguage] = useState("")
+  const [aiParsing, setAiParsing] = useState(false)
+  const [aiParsed, setAiParsed] = useState<AIReminderParsed | null>(null)
+  const [aiError, setAiError] = useState<string | null>(null)
+
   useEffect(() => {
     void loadUsers("initial")
     void loadAlertChannels()
@@ -331,6 +338,112 @@ export default function NewReminder() {
       setTestError(err instanceof Error ? err.message : "Unable to send test notification")
     } finally {
       setTesting(false)
+    }
+  }
+
+  const handleAIParseReminder = async () => {
+    if (!userId) {
+      setAiError("Please select a user first.")
+      return
+    }
+    
+    if (!naturalLanguage.trim()) {
+      setAiError("Please enter what you want to be reminded about.")
+      return
+    }
+
+    setAiParsing(true)
+    setAiError(null)
+    setAiParsed(null)
+
+    try {
+      const parsed = await aiRemindersApi.parse({
+        user_id: userId,
+        alert_channel_id: alertChannelId,
+        natural_language: naturalLanguage.trim()
+      })
+      
+      setAiParsed(parsed)
+      
+      // Auto-fill the traditional form fields with AI-parsed data
+      setTitle(parsed.title)
+      setBody(parsed.body || "")
+      
+      // Try to reverse-engineer schedule settings from cron
+      // This is a simplified approach - for complex crons, users can edit manually
+      const cronParts = parsed.cron.split(' ')
+      if (cronParts.length === 5) {
+        const [minute, hour, day, month, dow] = cronParts
+        
+        // Set time if hour and minute are specific
+        if (hour !== '*' && minute !== '*') {
+          const hourInt = parseInt(hour)
+          const minuteInt = parseInt(minute)
+          if (!isNaN(hourInt) && !isNaN(minuteInt)) {
+            setTime(`${hourInt.toString().padStart(2, '0')}:${minuteInt.toString().padStart(2, '0')}`)
+          }
+        }
+        
+        // Determine schedule type
+        if (day === '*' && month === '*' && dow === '*') {
+          setScheduleType('daily')
+        } else if (day === '*' && month === '*' && dow === '1-5') {
+          setScheduleType('weekdays')
+        } else if (day === '*' && month === '*' && dow.includes(',')) {
+          setScheduleType('weekly')
+          setWeeklyDays(dow.split(','))
+        } else if (day !== '*' && month === '*') {
+          setScheduleType('monthly')
+          setMonthlyDay(day)
+        } else if (day !== '*' && month !== '*') {
+          setScheduleType('yearly')
+          setYearlyMonth(month)
+          setYearlyDay(day)
+        } else {
+          setScheduleType('custom')
+          setCustomCron(parsed.cron)
+        }
+      }
+      
+    } catch (err: unknown) {
+      setAiError(err instanceof Error ? err.message : "Failed to parse reminder with AI")
+    } finally {
+      setAiParsing(false)
+    }
+  }
+
+  const handleAICreateReminder = async () => {
+    if (!userId) {
+      setAiError("Please select a user first.")
+      return
+    }
+    
+    if (!naturalLanguage.trim()) {
+      setAiError("Please enter what you want to be reminded about.")
+      return
+    }
+
+    setSubmitting(true)
+    setFormError(null)
+    setAiError(null)
+
+    try {
+      await aiRemindersApi.create({
+        user_id: userId,
+        alert_channel_id: alertChannelId,
+        natural_language: naturalLanguage.trim()
+      })
+      
+      setStatusMessage("AI reminder created successfully! The scheduler will send the first alert within the next minute.")
+      setNaturalLanguage("")
+      setAiParsed(null)
+      setUseAI(false)
+      void loadReminders() // Reload reminders to show the new one
+      
+    } catch (err: unknown) {
+      setAiError(err instanceof Error ? err.message : "Failed to create AI reminder")
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -503,6 +616,162 @@ export default function NewReminder() {
             {refreshingUsers || loadingChannels || loadingReminders ? "Refreshing..." : "Refresh data"}
           </button>
         </header>
+
+        {/* AI-Powered Reminder Creation */}
+        <div className="mt-8 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 p-6 shadow-sm ring-1 ring-blue-200">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100">
+              <svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">AI-Powered Reminder</h2>
+              <p className="text-sm text-slate-600">Just tell us what you want to be reminded about in plain English!</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-slate-700">Family member</span>
+                <select
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-blue-400 focus:outline-none"
+                  value={userId ?? ""}
+                  onChange={(event) => {
+                    const selected = event.target.value
+                    setUserId(selected ? Number(selected) : undefined)
+                  }}
+                  disabled={!hasUsers || aiParsing || submitting}
+                  required
+                >
+                  {hasUsers ? null : <option value="">No users available</option>}
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            {/* Alert Channel Selection for AI */}
+            <div className="space-y-1">
+              <span className="text-sm font-medium text-slate-700">Alert Channel (Optional)</span>
+              <select
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-blue-400 focus:outline-none"
+                value={alertChannelId ?? ""}
+                onChange={(event) => {
+                  const selected = event.target.value
+                  setAlertChannelId(selected ? Number(selected) : undefined)
+                }}
+                disabled={aiParsing || submitting}
+              >
+                <option value="">Use user's personal topic</option>
+                {alertChannels.map((channel) => (
+                  <option key={channel.id} value={channel.id}>
+                    {channel.name} ({channel.ntfy_topic})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-sm font-medium text-slate-700">What do you want to be reminded about?</span>
+              <textarea
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm shadow-sm transition focus:border-blue-400 focus:outline-none"
+                placeholder="Examples: 'Remind me to take my medication every day at 8am', 'Call mom every Sunday at 2pm', 'Pay rent on the 1st of every month at 9am'"
+                rows={3}
+                value={naturalLanguage}
+                onChange={(event) => setNaturalLanguage(event.target.value)}
+                disabled={!hasUsers || aiParsing || submitting}
+              />
+              <p className="text-xs text-slate-500">
+                Be as specific as possible about when and what you want to be reminded about.
+              </p>
+            </div>
+
+            {aiParsed && (
+              <div className="rounded-lg bg-white border border-green-200 p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-green-100">
+                    <svg className="h-3 w-3 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                    </svg>
+                  </div>
+                  <span className="text-sm font-medium text-green-800">AI Parsed Successfully</span>
+                  <span className={`px-2 py-1 text-xs rounded-full ${
+                    aiParsed.confidence === 'high' ? 'bg-green-100 text-green-800' :
+                    aiParsed.confidence === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {aiParsed.confidence} confidence
+                  </span>
+                </div>
+                
+                <div className="grid gap-2 text-sm">
+                  <div><span className="font-medium text-slate-700">Title:</span> {aiParsed.title}</div>
+                  {aiParsed.body && <div><span className="font-medium text-slate-700">Message:</span> {aiParsed.body}</div>}
+                  <div><span className="font-medium text-slate-700">Schedule:</span> {aiParsed.schedule_description}</div>
+                  <div><span className="font-medium text-slate-700">Cron:</span> <code className="bg-slate-100 px-1 rounded">{aiParsed.cron}</code></div>
+                  {aiParsed.next_execution && (
+                    <div><span className="font-medium text-slate-700">Next run:</span> {new Date(aiParsed.next_execution).toLocaleString()}</div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {aiError && (
+              <div className="rounded-lg bg-red-50 border border-red-200 p-3">
+                <p className="text-sm text-red-700">{aiError}</p>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-300 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={handleAIParseReminder}
+                disabled={!hasUsers || !naturalLanguage.trim() || aiParsing || submitting}
+              >
+                {aiParsing ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-700" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Parsing with AI...
+                  </>
+                ) : (
+                  <>
+                    <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                    </svg>
+                    Parse with AI
+                  </>
+                )}
+              </button>
+              
+              {aiParsed && (
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={handleAICreateReminder}
+                  disabled={!hasUsers || submitting}
+                >
+                  {submitting ? "Creating..." : "Create AI Reminder"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div className="mt-8 flex items-center">
+          <div className="flex-1 border-t border-slate-200"></div>
+          <span className="px-4 text-sm text-slate-500">or create manually</span>
+          <div className="flex-1 border-t border-slate-200"></div>
+        </div>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-10">
           <fieldset className="space-y-4">

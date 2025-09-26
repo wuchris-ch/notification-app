@@ -77,3 +77,19 @@ class TestNotificationIn(BaseModel):
     user_id: int
     title: str
     body: str | None = None
+
+
+class AIReminderIn(BaseModel):
+    user_id: int
+    alert_channel_id: Optional[int] = None
+    natural_language: str
+
+
+class AIReminderOut(BaseModel):
+    title: str
+    body: Optional[str]
+    cron: str
+    schedule_description: str
+    confidence: str
+    next_execution: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)

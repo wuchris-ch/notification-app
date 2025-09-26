@@ -193,3 +193,34 @@ export const testNotification = (userId: number, title: string, body?: string): 
     method: 'POST',
     body: JSON.stringify({ user_id: userId, title, body }),
   })
+
+// AI-powered reminder types
+export interface AIReminderInput {
+  user_id: number
+  alert_channel_id?: number
+  natural_language: string
+}
+
+export interface AIReminderParsed {
+  title: string
+  body?: string
+  cron: string
+  schedule_description: string
+  confidence: 'high' | 'medium' | 'low'
+  next_execution?: string
+}
+
+// AI-powered reminder API
+export const aiRemindersApi = {
+  parse: (data: AIReminderInput): Promise<AIReminderParsed> =>
+    fetchApi('/reminders/ai/parse', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
+  create: (data: AIReminderInput): Promise<Reminder> =>
+    fetchApi('/reminders/ai/create', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+}
