@@ -98,7 +98,7 @@ export default function Home() {
                 Set schedules and assign to family members.
               </p>
               <Button asChild className="w-full">
-                <Link href="/new">
+                <Link href="/dashboard">
                   Create New
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>

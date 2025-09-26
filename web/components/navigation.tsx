@@ -11,6 +11,10 @@ interface BreadcrumbItem {
 
 const pathToBreadcrumbs: Record<string, BreadcrumbItem[]> = {
   "/": [{ label: "Home", href: "/" }],
+  "/dashboard": [
+    { label: "Home", href: "/" },
+    { label: "Dashboard", href: "/dashboard" }
+  ],
   "/users": [
     { label: "Home", href: "/" },
     { label: "Manage Users", href: "/users" }
@@ -22,10 +26,6 @@ const pathToBreadcrumbs: Record<string, BreadcrumbItem[]> = {
   "/reminders": [
     { label: "Home", href: "/" },
     { label: "View Reminders", href: "/reminders" }
-  ],
-  "/new": [
-    { label: "Home", href: "/" },
-    { label: "Create Reminder", href: "/new" }
   ]
 }
 
@@ -71,14 +71,14 @@ export default function Navigation() {
 
           {/* Quick Actions */}
           <div className="flex items-center space-x-3">
-            <Link 
-              href="/"
+            <Link
+              href="/reminders"
               className="text-sm text-slate-600 hover:text-slate-900 transition-colors"
             >
-              Dashboard
+              Manage
             </Link>
-            <Link 
-              href="/new"
+            <Link
+              href="/dashboard"
               className="text-sm bg-slate-900 text-white px-3 py-1.5 rounded-lg hover:bg-slate-800 transition-colors"
             >
               New Reminder
