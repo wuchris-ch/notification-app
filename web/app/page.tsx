@@ -18,15 +18,6 @@ export default function Home() {
               Never miss important events, appointments, or tasks again.
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg">
-              Get Started
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="lg">
-              Learn More
-            </Button>
-          </div>
         </div>
 
         {/* Features Grid */}
