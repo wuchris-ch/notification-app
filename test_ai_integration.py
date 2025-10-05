@@ -19,7 +19,7 @@ async def test_ai_parsing():
     # Test cases
     test_cases = [
         "Remind me to take my medication every day at 8am",
-        "Call mom every Sunday at 2pm", 
+        "Call family member every Sunday at 2pm",
         "Pay rent on the 1st of every month at 9am",
         "Exercise every weekday at 6:30am",
         "Doctor appointment next Tuesday at 3pm"

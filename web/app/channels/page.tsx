@@ -269,7 +269,7 @@ export default function Channels() {
               Manage all notification channels. Each channel represents a destination for reminders.
             </p>
             <p className="text-xs text-slate-500 mt-2">
-              💡 <strong>Tip:</strong> Create channels for individuals (e.g., "Chris", "Mom") or groups (e.g., "Family Group"). Each person subscribes to their relevant channels on the ntfy app.
+              💡 <strong>Tip:</strong> Create channels for individuals (e.g., "Chris", "Alex") or groups (e.g., "Family Group"). Each person subscribes to their relevant channels on the ntfy app.
             </p>
           </div>
           <button
@@ -288,7 +288,7 @@ export default function Channels() {
               <span className="text-sm font-medium text-slate-700">Channel name</span>
               <input
                 className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm shadow-sm transition focus:border-slate-400 focus:bg-white focus:outline-none"
-                placeholder="Mom"
+                placeholder="Alex"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 required
@@ -298,7 +298,7 @@ export default function Channels() {
               <span className="text-sm font-medium text-slate-700">NTFY topic</span>
               <input
                 className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm shadow-sm transition focus:border-slate-400 focus:bg-white focus:outline-none"
-                placeholder="family-mom"
+                placeholder="family-alex"
                 value={topic}
                 onChange={(event) => {
                   setTopic(event.target.value)

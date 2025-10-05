@@ -64,7 +64,7 @@ python -m pytest tests/test_ai_reminder_parsing.py::TestAIReminderParsing::test_
 3. **test_afternoon_time_with_minutes** - "lunch meeting at 12:45pm"
    - Verifies: `45 12 * * *` (12:45pm daily)
 
-4. **test_weekly_recurrence** - "call mom every Sunday at 2:30pm"
+4. **test_weekly_recurrence** - "call family member every Sunday at 2:30pm"
    - Verifies: `30 14 * * 0` (2:30pm Sundays)
 
 5. **test_weekdays_recurrence** - "standup meeting weekdays at 9:15am"

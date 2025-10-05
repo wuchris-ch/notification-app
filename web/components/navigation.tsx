@@ -71,13 +71,13 @@ export default function Navigation() {
               href="/reminders"
               className="text-sm text-slate-600 hover:text-slate-900 transition-colors"
             >
-              Manage
+              Manage Reminders
             </Link>
             <Link
               href="/dashboard"
               className="text-sm bg-slate-900 text-white px-3 py-1.5 rounded-lg hover:bg-slate-800 transition-colors"
             >
-              New Reminder
+              Create Reminder
             </Link>
           </div>
         </div>

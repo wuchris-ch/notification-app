@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, Bell, Plus, Calendar, ArrowRight, CheckCircle } from "lucide-react"
+import { Bell, Plus, Calendar, ArrowRight } from "lucide-react"
 
 export default function Home() {
   return (
@@ -21,7 +21,7 @@ export default function Home() {
         </div>
 
         {/* Features Grid */}
-        <div className="grid gap-6 md:grid-cols-2 max-w-4xl mx-auto mb-16">
+        <div className="grid gap-6 md:grid-cols-3 max-w-6xl mx-auto mb-16">
           <Card>
             <CardHeader>
               <div className="flex items-center space-x-3">
@@ -103,29 +103,6 @@ export default function Home() {
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Status Section */}
-        <div className="max-w-md mx-auto">
-          <Card>
-            <CardHeader className="text-center">
-              <CardTitle className="text-lg">System Status</CardTitle>
-              <CardDescription>
-                Current system configuration
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="text-center">
-              <div className="flex items-center justify-center space-x-2">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <span className="text-sm text-muted-foreground">
-                  API Base: 
-                </span>
-                <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm">
-                  {process.env.NEXT_PUBLIC_API_BASE || '/api'}
-                </code>
-              </div>
             </CardContent>
           </Card>
         </div>

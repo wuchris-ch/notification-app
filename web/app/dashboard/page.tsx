@@ -546,7 +546,7 @@ export default function Dashboard() {
                     <label className="block text-sm font-medium text-slate-700 mb-1">What do you want to be reminded about?</label>
                     <textarea
                       className="w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm shadow-sm transition focus:border-blue-400 focus:outline-none"
-                      placeholder="Examples: 'Remind me to take my medication every day at 8am', 'Call mom every Sunday at 2pm'"
+                      placeholder="Examples: 'Remind me to take my medication every day at 8am', 'Call family member every Sunday at 2pm'"
                       rows={3}
                       value={naturalLanguage}
                       onChange={(event) => setNaturalLanguage(event.target.value)}

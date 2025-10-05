@@ -237,7 +237,7 @@ export default function Users() {
               Add each person who should receive reminders. Each person gets their own personal notification topic.
             </p>
             <p className="text-xs text-slate-500 mt-2">
-              💡 <strong>Tip:</strong> Each person subscribes to their personal topic on their phone (e.g., "family-mom"). For group notifications, create an Alert Channel that multiple people can subscribe to.
+              💡 <strong>Tip:</strong> Each person subscribes to their personal topic on their phone (e.g., "family-member"). For group notifications, create an Alert Channel that multiple people can subscribe to.
             </p>
           </div>
           <button

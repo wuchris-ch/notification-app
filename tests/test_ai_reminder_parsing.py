@@ -101,10 +101,10 @@ class TestAIReminderParsing:
     def test_weekly_recurrence(self):
         """
         Test Case: Weekly recurrence on specific day
-        Input: "call mom every Sunday at 2:30pm"
+        Input: "call family member every Sunday at 2:30pm"
         Expected: Cron should be "30 14 * * 0" (2:30pm every Sunday)
         """
-        input_text = "call mom every Sunday at 2:30pm"
+        input_text = "call family member every Sunday at 2:30pm"
         
         result = parse_natural_language_reminder(input_text, "America/Vancouver")
         
@@ -151,6 +151,64 @@ class TestAIReminderParsing:
         
         print(f"✓ Test passed: {input_text}")
         print(f"  → Cron: {result['cron']}")
+    
+    def test_specific_date_short_format(self):
+        """
+        Test Case: Specific date in short format
+        Input: "set reminder oct 12 to run"
+        Expected: Cron should be "0 8 12 10 *" (October 12 at 8am yearly)
+        """
+        input_text = "set reminder oct 12 to run"
+        
+        result = parse_natural_language_reminder(input_text, "America/Vancouver")
+        
+        assert result["recurrence"]["type"] == "yearly", f"Expected yearly recurrence, got {result['recurrence']['type']}"
+        assert result["recurrence"]["month"] == 10, f"Expected month=10 (October), got {result['recurrence']['month']}"
+        assert result["recurrence"]["day_of_month"] == 12, f"Expected day_of_month=12, got {result['recurrence']['day_of_month']}"
+        assert result["cron"] == "0 8 12 10 *", f"Expected '0 8 12 10 *', got '{result['cron']}'"
+        
+        print(f"✓ Test passed: {input_text}")
+        print(f"  → Cron: {result['cron']}")
+        print(f"  → Schedule: {result['schedule_description']}")
+    
+    def test_specific_date_full_month(self):
+        """
+        Test Case: Specific date with full month name
+        Input: "remind me on December 25 to call family"
+        Expected: Cron should be "0 8 25 12 *" (December 25 at 8am yearly)
+        """
+        input_text = "remind me on December 25 to call family"
+        
+        result = parse_natural_language_reminder(input_text, "America/Vancouver")
+        
+        assert result["recurrence"]["type"] == "yearly", f"Expected yearly recurrence, got {result['recurrence']['type']}"
+        assert result["recurrence"]["month"] == 12, f"Expected month=12 (December), got {result['recurrence']['month']}"
+        assert result["recurrence"]["day_of_month"] == 25, f"Expected day_of_month=25, got {result['recurrence']['day_of_month']}"
+        assert result["cron"] == "0 8 25 12 *", f"Expected '0 8 25 12 *', got '{result['cron']}'"
+        
+        print(f"✓ Test passed: {input_text}")
+        print(f"  → Cron: {result['cron']}")
+        print(f"  → Schedule: {result['schedule_description']}")
+    
+    def test_specific_date_with_time(self):
+        """
+        Test Case: Specific date with specific time
+        Input: "March 15 at 3pm doctor appointment"
+        Expected: Cron should be "0 15 15 3 *" (March 15 at 3pm yearly)
+        """
+        input_text = "March 15 at 3pm doctor appointment"
+        
+        result = parse_natural_language_reminder(input_text, "America/Vancouver")
+        
+        assert result["recurrence"]["type"] == "yearly", f"Expected yearly recurrence, got {result['recurrence']['type']}"
+        assert result["recurrence"]["month"] == 3, f"Expected month=3 (March), got {result['recurrence']['month']}"
+        assert result["recurrence"]["day_of_month"] == 15, f"Expected day_of_month=15, got {result['recurrence']['day_of_month']}"
+        assert result["time"]["hour"] == 15, f"Expected hour=15 (3pm), got {result['time']['hour']}"
+        assert result["cron"] == "0 15 15 3 *", f"Expected '0 15 15 3 *', got '{result['cron']}'"
+        
+        print(f"✓ Test passed: {input_text}")
+        print(f"  → Cron: {result['cron']}")
+        print(f"  → Schedule: {result['schedule_description']}")
 
 
 class TestCronBuilder:
@@ -205,6 +263,26 @@ class TestCronBuilder:
         
         with pytest.raises(ValueError, match="Invalid minute"):
             build_cron_from_structured_data(data)
+    
+    def test_build_cron_yearly(self):
+        """Test building yearly cron for specific date."""
+        data = {
+            "time": {"hour": 8, "minute": 0},
+            "recurrence": {"type": "yearly", "month": 10, "day_of_month": 12}
+        }
+        
+        cron = build_cron_from_structured_data(data)
+        assert cron == "0 8 12 10 *", f"Expected '0 8 12 10 *', got '{cron}'"
+    
+    def test_build_cron_monthly(self):
+        """Test building monthly cron."""
+        data = {
+            "time": {"hour": 9, "minute": 30},
+            "recurrence": {"type": "monthly", "day_of_month": 15}
+        }
+        
+        cron = build_cron_from_structured_data(data)
+        assert cron == "30 9 15 * *", f"Expected '30 9 15 * *', got '{cron}'"
 
 
 if __name__ == "__main__":

@@ -16,7 +16,7 @@ That's it! The test automatically loads environment variables from the `.env` fi
 1. ✅ Simple time with minutes: "remind me to take out trash at 8:15pm"
 2. ✅ Morning time with minutes: "wake up at 7:30am every day"
 3. ✅ Afternoon time with minutes: "lunch meeting at 12:45pm"
-4. ✅ Weekly recurrence: "call mom every Sunday at 2:30pm"
+4. ✅ Weekly recurrence: "call family member every Sunday at 2:30pm"
 5. ✅ Weekdays recurrence: "standup meeting weekdays at 9:15am"
 6. ✅ On the hour: "dinner reminder at 6pm"
 

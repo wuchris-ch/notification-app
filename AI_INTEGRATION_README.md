@@ -72,7 +72,7 @@ Parses natural language input and creates a reminder in one step.
 {
   "user_id": 1,
   "alert_channel_id": 2,  // optional
-  "natural_language": "Call mom every Sunday at 2pm"
+  "natural_language": "Call family member every Sunday at 2pm"
 }
 ```
 
@@ -82,7 +82,7 @@ Parses natural language input and creates a reminder in one step.
   "id": 123,
   "user_id": 1,
   "alert_channel_id": 2,
-  "title": "Call Mom",
+  "title": "Call Family Member",
   "body": null,
   "cron": "0 14 * * 0",
   "enabled": true,

@@ -123,7 +123,7 @@ Your task is to parse the user's natural language input and return a JSON object
     "recurrence": {{
         "type": "daily|weekly|monthly|yearly|once",
         "day_of_week": null,     // 0-6 for weekly (0=Sunday, 1=Monday, etc.) or list like [1,3,5]
-        "day_of_month": null,    // 1-31 for monthly
+        "day_of_month": null,    // 1-31 for monthly or yearly
         "month": null,           // 1-12 for yearly
         "weekdays_only": false   // true for Monday-Friday only
     }},
@@ -144,17 +144,24 @@ Recurrence parsing:
 - "every Monday" → type="weekly", day_of_week=1
 - "weekdays" → type="daily", weekdays_only=true
 - "every month on the 15th" → type="monthly", day_of_month=15
-- "once" or specific date → type="once"
+- Specific dates (e.g., "oct 12", "December 25", "March 1st") → type="yearly", month=<month_number>, day_of_month=<day>
+  Example: "oct 12" → type="yearly", month=10, day_of_month=12
+  Example: "December 25" → type="yearly", month=12, day_of_month=25
+- "once" without date → type="once" (will default to daily, user can disable after first fire)
+
+IMPORTANT: When parsing specific dates like "oct 12" or "December 25", ALWAYS use type="yearly" with the appropriate month and day_of_month fields.
 
 Examples:
 1. "remind me to take out trash at 8:15pm" →
    {{"title": "Take out trash", "time": {{"hour": 20, "minute": 15}}, "recurrence": {{"type": "daily"}}, "confidence": "high"}}
-
-2. "call mom every Sunday at 2:30pm" →
-   {{"title": "Call mom", "time": {{"hour": 14, "minute": 30}}, "recurrence": {{"type": "weekly", "day_of_week": 0}}, "confidence": "high"}}
-
+2. "call family member every Sunday at 2:30pm" →
+   {{"title": "Call family member", "time": {{"hour": 14, "minute": 30}}, "recurrence": {{"type": "weekly", "day_of_week": 0}}, "confidence": "high"}}
 3. "team meeting weekdays at 9am" →
    {{"title": "Team meeting", "time": {{"hour": 9, "minute": 0}}, "recurrence": {{"type": "daily", "weekdays_only": true}}, "confidence": "high"}}
+4. "set reminder oct 12 to run" →
+   {{"title": "Run", "time": {{"hour": 8, "minute": 0}}, "recurrence": {{"type": "yearly", "month": 10, "day_of_month": 12}}, "confidence": "high"}}
+5. "remind me on December 25 to call family" →
+   {{"title": "Call family", "time": {{"hour": 8, "minute": 0}}, "recurrence": {{"type": "yearly", "month": 12, "day_of_month": 25}}, "confidence": "high"}}
 
 Return only valid JSON. If you cannot parse confidently, set confidence to "low" and make reasonable assumptions."""
 
@@ -326,7 +333,8 @@ def generate_cron_description(cron: str) -> str:
         elif day != "*" and month != "*":
             months = ["", "January", "February", "March", "April", "May", "June",
                      "July", "August", "September", "October", "November", "December"]
-            freq_desc = f"on {months[int(month)]} {day}"
+            day_suffix = 'st' if day.endswith('1') and day != '11' else 'nd' if day.endswith('2') and day != '12' else 'rd' if day.endswith('3') and day != '13' else 'th'
+            freq_desc = f"on {months[int(month)]} {day}{day_suffix} every year"
         else:
             freq_desc = "on a custom schedule"
         
