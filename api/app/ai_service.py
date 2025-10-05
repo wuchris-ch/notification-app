@@ -25,9 +25,74 @@ def get_openrouter_client():
         api_key=api_key,
     )
 
+
+def build_cron_from_structured_data(parsed_data: Dict[str, Any]) -> str:
+    """
+    Build a cron expression from structured time and recurrence data.
+    This is deterministic and doesn't rely on AI to generate the cron string.
+    
+    Args:
+        parsed_data: Dictionary with 'time' and 'recurrence' fields
+        
+    Returns:
+        Valid cron expression string
+    """
+    time_data = parsed_data.get("time", {})
+    recurrence = parsed_data.get("recurrence", {})
+    
+    # Extract time components
+    minute = time_data.get("minute", 0)
+    hour = time_data.get("hour", 8)
+    
+    # Validate time
+    if not (0 <= hour <= 23):
+        raise ValueError(f"Invalid hour: {hour}. Must be 0-23")
+    if not (0 <= minute <= 59):
+        raise ValueError(f"Invalid minute: {minute}. Must be 0-59")
+    
+    # Build cron based on recurrence type
+    rec_type = recurrence.get("type", "daily")
+    
+    if rec_type == "daily":
+        if recurrence.get("weekdays_only"):
+            # Monday-Friday only
+            return f"{minute} {hour} * * 1-5"
+        else:
+            # Every day
+            return f"{minute} {hour} * * *"
+    
+    elif rec_type == "weekly":
+        day_of_week = recurrence.get("day_of_week")
+        if day_of_week is None:
+            raise ValueError("Weekly recurrence requires day_of_week")
+        if isinstance(day_of_week, list):
+            dow_str = ",".join(str(d) for d in day_of_week)
+            return f"{minute} {hour} * * {dow_str}"
+        else:
+            return f"{minute} {hour} * * {day_of_week}"
+    
+    elif rec_type == "monthly":
+        day_of_month = recurrence.get("day_of_month", 1)
+        return f"{minute} {hour} {day_of_month} * *"
+    
+    elif rec_type == "yearly":
+        day_of_month = recurrence.get("day_of_month", 1)
+        month = recurrence.get("month", 1)
+        return f"{minute} {hour} {day_of_month} {month} *"
+    
+    elif rec_type == "once":
+        # For one-time reminders, default to daily (user can disable after it fires)
+        return f"{minute} {hour} * * *"
+    
+    else:
+        # Default to daily
+        return f"{minute} {hour} * * *"
+
+
 def parse_natural_language_reminder(text: str, user_timezone: str = "America/Vancouver") -> Dict[str, Any]:
     """
     Parse natural language text into structured reminder data using AI.
+    AI returns structured data (time, recurrence), then we build the cron expression deterministically.
     
     Args:
         text: Natural language description of the reminder
@@ -51,54 +116,47 @@ Your task is to parse the user's natural language input and return a JSON object
 {{
     "title": "Brief, clear title for the reminder (max 120 chars)",
     "body": "Optional detailed message (can be null if not needed)",
-    "cron": "Valid cron expression (5 fields: minute hour day month dow)",
-    "schedule_description": "Human-readable description of when it runs",
-    "confidence": "high|medium|low - your confidence in the parsing"
+    "time": {{
+        "hour": 8,        // 0-23 in 24-hour format (8=8am, 20=8pm)
+        "minute": 0       // 0-59
+    }},
+    "recurrence": {{
+        "type": "daily|weekly|monthly|yearly|once",
+        "day_of_week": null,     // 0-6 for weekly (0=Sunday, 1=Monday, etc.) or list like [1,3,5]
+        "day_of_month": null,    // 1-31 for monthly
+        "month": null,           // 1-12 for yearly
+        "weekdays_only": false   // true for Monday-Friday only
+    }},
+    "confidence": "high|medium|low"
 }}
 
-Cron format: minute hour day month day-of-week
-- minute: 0-59
-- hour: 0-23 (24-hour format)
-- day: 1-31
-- month: 1-12
-- day-of-week: 0-6 (0=Sunday, 1=Monday, etc.)
+Time parsing rules:
+- "8am", "8:00am" → hour=8, minute=0
+- "8:15am" → hour=8, minute=15
+- "2:30pm", "14:30" → hour=14, minute=30
+- "8pm", "8:00pm" → hour=20, minute=0
+- "8:15pm" → hour=20, minute=15
+- "noon", "12pm" → hour=12, minute=0
+- "midnight", "12am" → hour=0, minute=0
+
+Recurrence parsing:
+- "every day", "daily" → type="daily"
+- "every Monday" → type="weekly", day_of_week=1
+- "weekdays" → type="daily", weekdays_only=true
+- "every month on the 15th" → type="monthly", day_of_month=15
+- "once" or specific date → type="once"
 
 Examples:
-- "0 8 * * *" = Daily at 8:00 AM
-- "30 7 * * 1-5" = Weekdays at 7:30 AM
-- "0 18 * * 0" = Sundays at 6:00 PM
-- "0 9 1 * *" = First day of every month at 9:00 AM
-- "0 12 25 12 *" = December 25th at noon
+1. "remind me to take out trash at 8:15pm" →
+   {{"title": "Take out trash", "time": {{"hour": 20, "minute": 15}}, "recurrence": {{"type": "daily"}}, "confidence": "high"}}
 
-Common patterns to recognize:
-- "every day/daily" → "* * *"
-- "weekdays" → "1-5" (Monday-Friday)
-- "weekends" → "0,6" (Sunday,Saturday)
-- "every Monday" → "1"
-- "every week" → same day of week
-- "every month" → same day of month
-- "every year" → same day and month
+2. "call mom every Sunday at 2:30pm" →
+   {{"title": "Call mom", "time": {{"hour": 14, "minute": 30}}, "recurrence": {{"type": "weekly", "day_of_week": 0}}, "confidence": "high"}}
 
-Time parsing:
-- "8am", "8:00am", "8 in the morning" → hour=8
-- "6pm", "6:00pm", "6 in the evening" → hour=18
-- "noon", "12pm" → hour=12
-- "midnight", "12am" → hour=0
+3. "team meeting weekdays at 9am" →
+   {{"title": "Team meeting", "time": {{"hour": 9, "minute": 0}}, "recurrence": {{"type": "daily", "weekdays_only": true}}, "confidence": "high"}}
 
-If time is not specified, use reasonable defaults:
-- Morning reminders: 8:00 AM
-- Medication: 8:00 AM, 12:00 PM, 6:00 PM (depending on context)
-- Evening reminders: 6:00 PM
-- Bedtime reminders: 9:00 PM
-
-Be smart about context:
-- "take medication" → likely daily
-- "doctor appointment" → likely one-time or specific date
-- "exercise" → likely daily or specific days
-- "call mom" → likely weekly
-- "pay bills" → likely monthly
-
-Return only valid JSON. If you cannot parse the input confidently, set confidence to "low" and make reasonable assumptions."""
+Return only valid JSON. If you cannot parse confidently, set confidence to "low" and make reasonable assumptions."""
 
     user_prompt = f"Parse this reminder request: {text}"
     
@@ -109,7 +167,7 @@ Return only valid JSON. If you cannot parse the input confidently, set confidenc
         logger.info(f"Parsing natural language: {text[:50]}...")
         
         response = client.chat.completions.create(
-            model="x-ai/grok-4-fast:free",
+            model="deepseek/deepseek-chat-v3.1:free",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
@@ -129,23 +187,43 @@ Return only valid JSON. If you cannot parse the input confidently, set confidenc
         
         parsed_data = json.loads(content)
         
-        # Validate the cron expression
-        try:
-            croniter(parsed_data["cron"])
-        except (ValueError, KeyError) as e:
-            logger.error(f"Invalid cron expression: {parsed_data.get('cron', 'None')} - {e}")
-            raise ValueError("Invalid cron expression generated by AI")
+        # DEBUG: Log the parsed structured data
+        logger.info(f"🔍 DEBUG - AI returned structured data: {parsed_data}")
         
         # Ensure required fields
         if not parsed_data.get("title"):
             logger.error("AI did not generate a title")
             raise ValueError("No title generated by AI")
         
+        if "time" not in parsed_data:
+            logger.error("AI did not generate time data")
+            raise ValueError("No time data generated by AI")
+        
+        # Build cron expression from structured data
+        cron_expression = build_cron_from_structured_data(parsed_data)
+        parsed_data["cron"] = cron_expression
+        
+        logger.info(f"🔍 DEBUG - Built cron expression: {cron_expression}")
+        
+        # Validate the cron expression
+        try:
+            croniter(cron_expression)
+        except ValueError as e:
+            logger.error(f"Invalid cron expression built: {cron_expression} - {e}")
+            raise ValueError(f"Invalid cron expression: {e}")
+        
         # Truncate title if too long
         if len(parsed_data["title"]) > 120:
             parsed_data["title"] = parsed_data["title"][:117] + "..."
         
-        logger.info(f"Successfully parsed: {parsed_data['title']} - {parsed_data['cron']}")
+        # Generate human-readable schedule description
+        parsed_data["schedule_description"] = generate_cron_description(cron_expression)
+        
+        # Ensure timezone is included in the response
+        if "timezone" not in parsed_data:
+            parsed_data["timezone"] = user_timezone
+        
+        logger.info(f"Successfully parsed: {parsed_data['title']} - {cron_expression}")
         return parsed_data
         
     except json.JSONDecodeError as e:

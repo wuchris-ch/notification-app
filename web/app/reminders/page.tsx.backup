@@ -2,22 +2,125 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { remindersApi, channelsApi, logsApi, Channel, Reminder, DeliveryLog } from "../../lib/api"
-import { EditReminderForm } from "../../components/reminders/EditReminderForm"
-import { getScheduleDescription, parseCronToState } from "../../lib/cron-utils"
+import { remindersApi, usersApi, logsApi, alertChannelsApi, User, Reminder, DeliveryLog, AlertChannel } from "../../lib/api"
+
+interface EditReminderFormProps {
+  reminder: Reminder
+  users: User[]
+  alertChannels: AlertChannel[]
+  onSave: (reminder: Reminder) => void
+  onCancel: () => void
+  submitting: boolean
+  setReminder: (reminder: Reminder) => void
+}
+
+function EditReminderForm({ reminder, users, alertChannels, onSave, onCancel, submitting, setReminder }: EditReminderFormProps) {
+  const updateField = (field: keyof Reminder, value: string | number | boolean | undefined) => {
+    setReminder({ ...reminder, [field]: value })
+  }
+
+  return (
+    <div className="space-y-3 p-4 bg-slate-50 rounded-lg">
+      <div>
+        <label className="block text-xs font-medium text-slate-700 mb-1">User</label>
+        <select
+          className="w-full rounded border border-slate-200 px-2 py-1 text-sm"
+          value={reminder.user_id}
+          onChange={(e) => updateField('user_id', parseInt(e.target.value))}
+        >
+          {users.map(user => (
+            <option key={user.id} value={user.id}>{user.name}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-slate-700 mb-1">Alert Channel (Optional)</label>
+        <select
+          className="w-full rounded border border-slate-200 px-2 py-1 text-sm"
+          value={reminder.alert_channel_id || ''}
+          onChange={(e) => updateField('alert_channel_id', e.target.value ? parseInt(e.target.value) : undefined)}
+        >
+          <option value="">Personal reminder (user's topic only)</option>
+          {alertChannels.map(channel => (
+            <option key={channel.id} value={channel.id}>{channel.name} (shared)</option>
+          ))}
+        </select>
+        <p className="text-xs text-slate-500 mt-1">
+          Leave empty for personal reminders. Select a channel to send to multiple people.
+        </p>
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-slate-700 mb-1">Title</label>
+        <input
+          className="w-full rounded border border-slate-200 px-2 py-1 text-sm"
+          value={reminder.title}
+          onChange={(e) => updateField('title', e.target.value)}
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-slate-700 mb-1">Body</label>
+        <textarea
+          className="w-full rounded border border-slate-200 px-2 py-1 text-sm"
+          value={reminder.body || ''}
+          onChange={(e) => updateField('body', e.target.value)}
+          rows={2}
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-slate-700 mb-1">Cron Expression</label>
+        <input
+          className="w-full rounded border border-slate-200 px-2 py-1 text-sm font-mono"
+          value={reminder.cron}
+          onChange={(e) => updateField('cron', e.target.value)}
+          placeholder="0 9 * * *"
+        />
+        <p className="text-xs text-slate-500 mt-1">Format: minute hour day month day-of-week</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          id={`enabled-${reminder.id}`}
+          checked={reminder.enabled}
+          onChange={(e) => updateField('enabled', e.target.checked)}
+          className="rounded"
+        />
+        <label htmlFor={`enabled-${reminder.id}`} className="text-xs font-medium text-slate-700">
+          Enabled
+        </label>
+      </div>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => onSave(reminder)}
+          disabled={submitting}
+          className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
+        >
+          {submitting ? "Saving..." : "Save"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-xs bg-slate-600 text-white px-3 py-1 rounded hover:bg-slate-700"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
 
 export default function Reminders() {
   const [reminders, setReminders] = useState<Reminder[]>([])
-  const [channels, setChannels] = useState<Channel[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [alertChannels, setAlertChannels] = useState<AlertChannel[]>([])
   const [logs, setLogs] = useState<DeliveryLog[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null)
-  const [editingChannelIds, setEditingChannelIds] = useState<number[]>([])
   const [deleting, setDeleting] = useState<number | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [selectedChannelId, setSelectedChannelId] = useState<number | 'all'>('all')
+  const [selectedUserId, setSelectedUserId] = useState<number | 'all'>('all')
   const [showLogs, setShowLogs] = useState<number | null>(null)
 
   useEffect(() => {
@@ -35,12 +138,14 @@ export default function Reminders() {
     setError(null)
     
     try {
-      const [remindersData, channelsData] = await Promise.all([
+      const [remindersData, usersData, alertChannelsData] = await Promise.all([
         remindersApi.list(),
-        channelsApi.list()
+        usersApi.list(),
+        alertChannelsApi.list()
       ])
       setReminders(remindersData)
-      setChannels(channelsData)
+      setUsers(usersData)
+      setAlertChannels(alertChannelsData)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load data")
     } finally {
@@ -58,27 +163,21 @@ export default function Reminders() {
     }
   }
 
-  const startEditing = (reminder: Reminder) => {
-    setEditingReminder(reminder)
-    setEditingChannelIds(reminder.channels.map(c => c.id))
-  }
-
-  const updateReminder = async (reminder: Reminder, channelIds: number[]) => {
+  const updateReminder = async (reminder: Reminder) => {
     setSubmitting(true)
     setError(null)
 
     try {
       await remindersApi.update(reminder.id, {
+        user_id: reminder.user_id,
+        alert_channel_id: reminder.alert_channel_id,
         title: reminder.title,
         body: reminder.body,
         cron: reminder.cron,
-        timezone: reminder.timezone,
-        channel_ids: channelIds,
         enabled: reminder.enabled,
       })
       setFeedback("Reminder updated successfully.")
       setEditingReminder(null)
-      setEditingChannelIds([])
       await loadData()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to update reminder")
@@ -112,12 +211,18 @@ export default function Reminders() {
     }
   }
 
-  const filteredReminders = selectedChannelId === 'all' 
+  const filteredReminders = selectedUserId === 'all' 
     ? reminders 
-    : reminders.filter(r => r.channels.some(c => c.id === selectedChannelId))
+    : reminders.filter(r => r.user_id === selectedUserId)
 
-  const getChannelName = (channelId: number) => {
-    return channels.find(c => c.id === channelId)?.name || `Channel ${channelId}`
+  const getUserName = (userId: number) => {
+    return users.find(u => u.id === userId)?.name || `User ${userId}`
+  }
+
+  const getChannelName = (channelId?: number) => {
+    if (!channelId) return "Personal (user's topic)"
+    const channel = alertChannels.find(c => c.id === channelId)
+    return channel ? `${channel.name} (shared)` : `Channel ${channelId}`
   }
 
   if (loading) {
@@ -135,7 +240,7 @@ export default function Reminders() {
           <div>
             <h1 className="text-3xl font-semibold text-slate-900">Manage Reminders</h1>
             <p className="text-sm text-slate-600">
-              View, edit, and manage all reminders. Filter by channel to see specific reminders.
+              View, edit, and manage all family reminders. Filter by user to see specific reminders.
             </p>
           </div>
           <div className="flex gap-2">
@@ -146,7 +251,7 @@ export default function Reminders() {
               Refresh
             </button>
             <Link
-              href="/dashboard"
+              href="/new"
               className="px-4 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800"
             >
               New Reminder
@@ -156,18 +261,18 @@ export default function Reminders() {
 
         {/* Filter */}
         <div className="mt-6">
-          <label className="block text-sm font-medium text-slate-700 mb-2">Filter by Channel</label>
+          <label className="block text-sm font-medium text-slate-700 mb-2">Filter by User</label>
           <select
             className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
-            value={selectedChannelId}
-            onChange={(e) => setSelectedChannelId(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+            value={selectedUserId}
+            onChange={(e) => setSelectedUserId(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
           >
-            <option value="all">All Channels ({reminders.length} reminders)</option>
-            {channels.map(channel => {
-              const count = reminders.filter(r => r.channels.some(c => c.id === channel.id)).length
+            <option value="all">All Users ({reminders.length} reminders)</option>
+            {users.map(user => {
+              const count = reminders.filter(r => r.user_id === user.id).length
               return (
-                <option key={channel.id} value={channel.id}>
-                  {channel.name} ({count} reminders)
+                <option key={user.id} value={user.id}>
+                  {user.name} ({count} reminders)
                 </option>
               )
             })}
@@ -192,13 +297,13 @@ export default function Reminders() {
         {filteredReminders.length === 0 ? (
           <div className="rounded-lg bg-white p-8 text-center shadow-sm ring-1 ring-slate-200">
             <p className="text-slate-600">
-              {selectedChannelId === 'all' 
+              {selectedUserId === 'all' 
                 ? "No reminders found. Create your first reminder to get started." 
-                : `No reminders found for ${getChannelName(selectedChannelId as number)}.`
+                : `No reminders found for ${getUserName(selectedUserId as number)}.`
               }
             </p>
             <Link
-              href="/dashboard"
+              href="/new"
               className="mt-3 inline-block px-4 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800"
             >
               Create Reminder
@@ -211,16 +316,12 @@ export default function Reminders() {
                 {editingReminder?.id === reminder.id ? (
                   <EditReminderForm
                     reminder={editingReminder}
-                    channels={channels}
+                    users={users}
+                    alertChannels={alertChannels}
                     onSave={updateReminder}
-                    onCancel={() => {
-                      setEditingReminder(null)
-                      setEditingChannelIds([])
-                    }}
+                    onCancel={() => setEditingReminder(null)}
                     submitting={submitting}
                     setReminder={setEditingReminder}
-                    selectedChannelIds={editingChannelIds}
-                    setSelectedChannelIds={setEditingChannelIds}
                   />
                 ) : (
                   <>
@@ -241,16 +342,20 @@ export default function Reminders() {
                           <p className="text-slate-600 mb-3">{reminder.body}</p>
                         )}
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                           <div>
-                            <span className="text-slate-500">Channels:</span>
-                            <p className="font-medium">
-                              {reminder.channels.map(c => c.name).join(', ') || 'None'}
-                            </p>
+                            <span className="text-slate-500">User:</span>
+                            <p className="font-medium">{getUserName(reminder.user_id)}</p>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">Destination:</span>
+                            <p className="font-medium">{getChannelName(reminder.alert_channel_id)}</p>
                           </div>
                           <div>
                             <span className="text-slate-500">Schedule:</span>
-                            <p className="font-medium">{getScheduleDescription(parseCronToState(reminder.cron))}</p>
+                            <p className="font-mono text-xs bg-slate-100 px-2 py-1 rounded mt-1">
+                              {reminder.cron}
+                            </p>
                           </div>
                           <div>
                             <span className="text-slate-500">Created:</span>
@@ -266,7 +371,7 @@ export default function Reminders() {
 
                     <div className="mt-4 flex flex-wrap gap-2">
                       <button
-                        onClick={() => startEditing(reminder)}
+                        onClick={() => setEditingReminder(reminder)}
                         className="text-xs text-blue-600 hover:text-blue-800"
                       >
                         Edit

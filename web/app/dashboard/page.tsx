@@ -3,7 +3,9 @@
 
 import Link from "next/link"
 import { FormEvent, useEffect, useMemo, useState, useCallback } from "react"
-import { remindersApi, alertChannelsApi, aiRemindersApi, usersApi, User, Reminder, AlertChannel, AIReminderParsed } from "../../lib/api"
+import { remindersApi, channelsApi, aiRemindersApi, Channel, Reminder, AIReminderParsed } from "../../lib/api"
+import { EditReminderForm } from "../../components/reminders/EditReminderForm"
+import { getScheduleDescription, parseCronToState, getOrdinalSuffix } from "../../lib/cron-utils"
 
 interface RecurrencePattern {
   id: string
@@ -18,8 +20,19 @@ const RECURRENCE_PATTERNS: RecurrencePattern[] = [
   { id: 'monthly', label: 'Monthly', description: 'Every month', cronTemplate: '{minute} {hour} {day} * *' },
   { id: 'yearly', label: 'Yearly', description: 'Every year', cronTemplate: '{minute} {hour} {day} {month} *' },
   { id: 'weekdays', label: 'Weekdays', description: 'Monday to Friday', cronTemplate: '{minute} {hour} * * 1-5' },
-  { id: 'weekends', label: 'Weekends', description: 'Saturday and Sunday', cronTemplate: '{minute} {hour} * * 0,6' },
-  { id: 'custom', label: 'Custom', description: 'Manual cron expression', cronTemplate: '' }
+  { id: 'weekends', label: 'Weekends', description: 'Saturday and Sunday', cronTemplate: '{minute} {hour} * * 0,6' }
+]
+
+
+const timezoneOptions = [
+  { value: "America/Vancouver", label: "Pacific - Vancouver" },
+  { value: "America/Los_Angeles", label: "Pacific - Los Angeles" },
+  { value: "America/Denver", label: "Mountain - Denver" },
+  { value: "America/Chicago", label: "Central - Chicago" },
+  { value: "America/New_York", label: "Eastern - New York" },
+  { value: "Europe/London", label: "UK - London" },
+  { value: "Europe/Paris", label: "Europe - Paris" },
+  { value: "Australia/Sydney", label: "Australia - Sydney" },
 ]
 
 const DAYS_OF_WEEK = [
@@ -41,12 +54,10 @@ const MONTHS = [
 
 export default function Dashboard() {
   // Form state
-  const [users, setUsers] = useState<User[]>([])
-  const [loadingUsers, setLoadingUsers] = useState(true)
-  const [userId, setUserId] = useState<number | undefined>(undefined)
-
-  const [alertChannels, setAlertChannels] = useState<AlertChannel[]>([])
-  const [alertChannelId, setAlertChannelId] = useState<number | undefined>(undefined)
+  const [channels, setChannels] = useState<Channel[]>([])
+  const [loadingChannels, setLoadingChannels] = useState(true)
+  const [selectedChannelIds, setSelectedChannelIds] = useState<number[]>([])
+  const [timezone, setTimezone] = useState("America/Vancouver")
 
   const [title, setTitle] = useState("")
   const [body, setBody] = useState("")
@@ -75,12 +86,14 @@ export default function Dashboard() {
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [loadingReminders, setLoadingReminders] = useState(true)
   const [remindersError, setRemindersError] = useState<string | null>(null)
-  const [selectedUserId, setSelectedUserId] = useState<number | 'all'>('all')
+  const [selectedChannelId, setSelectedChannelId] = useState<number | 'all'>('all')
+  const [editingReminder, setEditingReminder] = useState<Reminder | null>(null)
+  const [editingChannelIds, setEditingChannelIds] = useState<number[]>([])
+  const [deleting, setDeleting] = useState<number | null>(null)
 
   // Load data on mount
   useEffect(() => {
-    void loadUsers()
-    void loadAlertChannels()
+    void loadChannels()
     void loadReminders()
   }, [])
 
@@ -119,31 +132,15 @@ export default function Dashboard() {
     return () => window.clearTimeout(timer)
   }, [statusMessage])
 
-  const loadUsers = async () => {
-    setLoadingUsers(true)
+  const loadChannels = async () => {
+    setLoadingChannels(true)
     try {
-      const data = await usersApi.list()
-      setUsers(data)
-      setUserId((current) => {
-        if (current && data.some((user) => user.id === current)) {
-          return current
-        }
-        return data.length > 0 ? data[0].id : undefined
-      })
+      const data = await channelsApi.list()
+      setChannels(data.filter(channel => channel.enabled))
     } catch (err: unknown) {
-      setUsers([])
-      setUserId(undefined)
+      setChannels([])
     } finally {
-      setLoadingUsers(false)
-    }
-  }
-
-  const loadAlertChannels = async () => {
-    try {
-      const data = await alertChannelsApi.list()
-      setAlertChannels(data.filter(channel => channel.enabled))
-    } catch (err: unknown) {
-      // Handle error silently for now
+      setLoadingChannels(false)
     }
   }
 
@@ -191,11 +188,16 @@ export default function Dashboard() {
         : [...prev, dayId].sort()
     )
   }
+  const toggleChannel = (channelId: number) => {
+    setSelectedChannelIds(prev =>
+      prev.includes(channelId)
+        ? prev.filter(id => id !== channelId)
+        : [...prev, channelId]
+    )
+  }
 
-  const getScheduleDescription = () => {
-    const pattern = RECURRENCE_PATTERNS.find(p => p.id === selectedPattern)
-    if (!pattern) return ''
 
+  const getLocalScheduleDescription = () => {
     const timeStr = `${selectedHour.toString().padStart(2, '0')}:${selectedMinute.toString().padStart(2, '0')}`
     
     switch (selectedPattern) {
@@ -214,25 +216,12 @@ export default function Dashboard() {
         return `Every weekday (Mon-Fri) at ${timeStr}`
       case 'weekends':
         return `Every weekend (Sat-Sun) at ${timeStr}`
-      case 'custom':
-        return customCron ? `Custom: ${customCron}` : 'Enter custom cron expression'
       default:
-        return pattern.description
+        return ''
     }
   }
 
-  const getOrdinalSuffix = (num: number) => {
-    const j = num % 10
-    const k = num % 100
-    if (j === 1 && k !== 11) return 'st'
-    if (j === 2 && k !== 12) return 'nd'
-    if (j === 3 && k !== 13) return 'rd'
-    return 'th'
-  }
-
   const getCurrentCron = () => {
-    if (selectedPattern === 'custom') return customCron
-    
     const pattern = RECURRENCE_PATTERNS.find(p => p.id === selectedPattern)
     if (!pattern) return ''
 
@@ -257,8 +246,8 @@ export default function Dashboard() {
   }
 
   const handleAIParseReminder = async () => {
-    if (!userId) {
-      setAiError("Please select a user first.")
+    if (selectedChannelIds.length === 0) {
+      setAiError("Please select at least one channel.")
       return
     }
     
@@ -273,8 +262,8 @@ export default function Dashboard() {
 
     try {
       const parsed = await aiRemindersApi.parse({
-        user_id: userId,
-        alert_channel_id: alertChannelId,
+        channel_ids: selectedChannelIds,
+        timezone: timezone,
         natural_language: naturalLanguage.trim()
       })
       
@@ -290,8 +279,8 @@ export default function Dashboard() {
   }
 
   const handleAICreateReminder = async () => {
-    if (!userId) {
-      setAiError("Please select a user first.")
+    if (selectedChannelIds.length === 0) {
+      setAiError("Please select at least one channel.")
       return
     }
     
@@ -306,8 +295,8 @@ export default function Dashboard() {
 
     try {
       await aiRemindersApi.create({
-        user_id: userId,
-        alert_channel_id: alertChannelId,
+        channel_ids: selectedChannelIds,
+        timezone: timezone,
         natural_language: naturalLanguage.trim()
       })
       
@@ -328,8 +317,8 @@ export default function Dashboard() {
     setFormError(null)
     setStatusMessage(null)
 
-    if (!userId) {
-      setFormError("Please select a user first.")
+    if (selectedChannelIds.length === 0) {
+      setFormError("Please select at least one channel.")
       return
     }
 
@@ -347,8 +336,8 @@ export default function Dashboard() {
     setSubmitting(true)
     try {
       await remindersApi.create({
-        user_id: userId,
-        alert_channel_id: alertChannelId,
+        channel_ids: selectedChannelIds,
+        timezone: timezone,
         title: title.trim(),
         body: body.trim() ? body.trim() : undefined,
         cron: cron,
@@ -356,7 +345,7 @@ export default function Dashboard() {
       setStatusMessage("Reminder saved successfully!")
       setTitle("")
       setBody("")
-      setAlertChannelId(undefined)
+      // Channel IDs remain selected
       void loadReminders()
     } catch (err: unknown) {
       setFormError(err instanceof Error ? err.message : "Unable to create reminder")
@@ -365,22 +354,120 @@ export default function Dashboard() {
     }
   }
 
-  const hasUsers = users.length > 0
+  const hasChannels = channels.length > 0
   
-  const getUserName = (userId: number) => {
-    return users.find(u => u.id === userId)?.name || `User ${userId}`
+  const getChannelName = (channelId: number) => {
+    return channels.find(c => c.id === channelId)?.name || `Channel ${channelId}`
   }
 
-  const filteredReminders = selectedUserId === 'all' 
-    ? reminders 
-    : reminders.filter(r => r.user_id === selectedUserId)
+  const filteredReminders = selectedChannelId === 'all'
+    ? reminders
+    : reminders.filter(r => r.channels.some(c => c.id === selectedChannelId))
 
   const formatCronDescription = (cron: string) => {
-    if (cron === "0 9 * * *") return "Daily at 9:00 AM"
-    if (cron === "0 18 * * *") return "Daily at 6:00 PM"
-    if (cron === "30 7 * * 1-5") return "Weekdays at 7:30 AM"
+    const parts = cron.trim().split(/\s+/)
+    if (parts.length !== 5) return cron
+    
+    const [minute, hour, dayOfMonth, month, dayOfWeek] = parts
+    
+    // Format time
+    const hourNum = parseInt(hour)
+    const minuteNum = parseInt(minute)
+    if (isNaN(hourNum) || isNaN(minuteNum)) return cron
+    
+    const timeStr = `${hourNum.toString().padStart(2, '0')}:${minuteNum.toString().padStart(2, '0')}`
+    
+    // Check pattern type
+    if (dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
+      return `Every day at ${timeStr}`
+    }
+    
+    if (dayOfMonth === '*' && month === '*' && dayOfWeek === '1-5') {
+      return `Every weekday (Mon-Fri) at ${timeStr}`
+    }
+    
+    if (dayOfMonth === '*' && month === '*' && (dayOfWeek === '0,6' || dayOfWeek === '6,0')) {
+      return `Every weekend (Sat-Sun) at ${timeStr}`
+    }
+    
+    if (dayOfMonth === '*' && month === '*' && dayOfWeek !== '*') {
+      const days = dayOfWeek.split(',').map(d => {
+        const day = DAYS_OF_WEEK.find(dow => dow.id === d.trim())
+        return day ? day.name : d
+      })
+      return `Every ${days.join(', ')} at ${timeStr}`
+    }
+    
+    if (dayOfMonth !== '*' && month === '*' && dayOfWeek === '*') {
+      const day = parseInt(dayOfMonth)
+      return `Every month on the ${day}${getOrdinalSuffix(day)} at ${timeStr}`
+    }
+    
+    if (dayOfMonth !== '*' && month !== '*') {
+      const day = parseInt(dayOfMonth)
+      const monthName = MONTHS.find(m => m.id === month)?.label || month
+      return `Every year on ${monthName} ${day}${getOrdinalSuffix(day)} at ${timeStr}`
+    }
+    
     return cron
   }
+
+  const startEditing = (reminder: Reminder) => {
+    setEditingReminder(reminder)
+    setEditingChannelIds(reminder.channels.map(c => c.id))
+  }
+
+  const updateReminder = async (reminder: Reminder, channelIds: number[]) => {
+    setSubmitting(true)
+    setFormError(null)
+
+    try {
+      await remindersApi.update(reminder.id, {
+        title: reminder.title,
+        body: reminder.body,
+        cron: reminder.cron,
+        timezone: reminder.timezone,
+        channel_ids: channelIds,
+        enabled: reminder.enabled,
+      })
+      setStatusMessage("Reminder updated successfully!")
+      setEditingReminder(null)
+      setEditingChannelIds([])
+      await loadReminders()
+    } catch (err: unknown) {
+      setFormError(err instanceof Error ? err.message : "Unable to update reminder")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const deleteReminder = async (reminderId: number) => {
+    if (!confirm("Are you sure you want to delete this reminder?")) return
+    
+    setDeleting(reminderId)
+    setFormError(null)
+
+    try {
+      await remindersApi.delete(reminderId)
+      setStatusMessage("Reminder deleted successfully!")
+      await loadReminders()
+    } catch (err: unknown) {
+      setFormError(err instanceof Error ? err.message : "Unable to delete reminder")
+    } finally {
+      setDeleting(null)
+    }
+  }
+
+  const toggleEnabled = async (reminder: Reminder) => {
+    try {
+      await remindersApi.update(reminder.id, { enabled: !reminder.enabled })
+      setStatusMessage(`Reminder ${reminder.enabled ? 'disabled' : 'enabled'}!`)
+      await loadReminders()
+    } catch (err: unknown) {
+      setFormError(err instanceof Error ? err.message : "Unable to update reminder")
+    }
+  }
+
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -394,7 +481,7 @@ export default function Dashboard() {
               <header className="mb-8">
                 <h1 className="text-3xl font-semibold text-slate-900 mb-2">Create Reminder</h1>
                 <p className="text-sm text-slate-600">
-                  Choose who receives it, what it says, and when it goes out. Leave alert channel empty for personal reminders.
+                  Choose which channels receive it, what it says, and when it goes out.
                 </p>
               </header>
 
@@ -414,22 +501,43 @@ export default function Dashboard() {
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Family member</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Send to channels (select at least one)
+                    </label>
+                    <div className="space-y-2 max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-3 bg-white">
+                      {!hasChannels ? (
+                        <p className="text-sm text-slate-500">No channels available</p>
+                      ) : (
+                        channels.map(channel => (
+                          <label key={channel.id} className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedChannelIds.includes(channel.id)}
+                              onChange={() => toggleChannel(channel.id)}
+                              disabled={aiParsing || submitting}
+                              className="rounded"
+                            />
+                            <span className="text-sm">{channel.name}</span>
+                            <code className="text-xs text-slate-500">({channel.ntfy_topic})</code>
+                          </label>
+                        ))
+                      )}
+                    </div>
+                    {selectedChannelIds.length === 0 && (
+                      <p className="text-xs text-red-600 mt-1">Select at least one channel</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Timezone</label>
                     <select
                       className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-blue-400 focus:outline-none"
-                      value={userId ?? ""}
-                      onChange={(event) => {
-                        const selected = event.target.value
-                        setUserId(selected ? Number(selected) : undefined)
-                      }}
-                      disabled={!hasUsers || aiParsing || submitting}
-                      required
+                      value={timezone}
+                      onChange={(e) => setTimezone(e.target.value)}
+                      disabled={aiParsing || submitting}
                     >
-                      {hasUsers ? null : <option value="">No users available</option>}
-                      {users.map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.name}
-                        </option>
+                      {timezoneOptions.map(tz => (
+                        <option key={tz.value} value={tz.value}>{tz.label}</option>
                       ))}
                     </select>
                   </div>
@@ -442,7 +550,7 @@ export default function Dashboard() {
                       rows={3}
                       value={naturalLanguage}
                       onChange={(event) => setNaturalLanguage(event.target.value)}
-                      disabled={!hasUsers || aiParsing || submitting}
+                      disabled={!hasChannels || aiParsing || submitting}
                     />
                   </div>
 
@@ -476,7 +584,7 @@ export default function Dashboard() {
                       type="button"
                       className="inline-flex items-center justify-center rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
                       onClick={handleAIParseReminder}
-                      disabled={!hasUsers || !naturalLanguage.trim() || aiParsing || submitting}
+                      disabled={!hasChannels || selectedChannelIds.length === 0 || !naturalLanguage.trim() || aiParsing || submitting}
                     >
                       {aiParsing ? "Parsing..." : "Parse with AI"}
                     </button>
@@ -486,7 +594,7 @@ export default function Dashboard() {
                         type="button"
                         className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                         onClick={handleAICreateReminder}
-                        disabled={!hasUsers || submitting}
+                        disabled={!hasChannels || selectedChannelIds.length === 0 || submitting}
                       >
                         {submitting ? "Creating..." : "Create AI Reminder"}
                       </button>
@@ -508,47 +616,45 @@ export default function Dashboard() {
                 <div className="lg:col-span-2">
                   <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Family member</label>
-                      <select
-                        className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm shadow-sm transition focus:border-slate-400 focus:bg-white focus:outline-none"
-                        value={userId ?? ""}
-                        onChange={(event) => {
-                          const selected = event.target.value
-                          setUserId(selected ? Number(selected) : undefined)
-                        }}
-                        disabled={!hasUsers || submitting}
-                        required
-                      >
-                        {hasUsers ? null : <option value="">No users available</option>}
-                        {users.map((user) => (
-                          <option key={user.id} value={user.id}>
-                            {user.name}
-                          </option>
-                        ))}
-                      </select>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Send to channels (select at least one)
+                      </label>
+                      <div className="space-y-2 max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-3 bg-slate-50">
+                        {!hasChannels ? (
+                          <p className="text-sm text-slate-500">No channels available</p>
+                        ) : (
+                          channels.map(channel => (
+                            <label key={channel.id} className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={selectedChannelIds.includes(channel.id)}
+                                onChange={() => toggleChannel(channel.id)}
+                                disabled={submitting}
+                                className="rounded"
+                              />
+                              <span className="text-sm">{channel.name}</span>
+                              <code className="text-xs text-slate-500">({channel.ntfy_topic})</code>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                      {selectedChannelIds.length === 0 && (
+                        <p className="text-xs text-red-600 mt-1">Select at least one channel</p>
+                      )}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Alert Channel (Optional)</label>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Timezone</label>
                       <select
                         className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm shadow-sm transition focus:border-slate-400 focus:bg-white focus:outline-none"
-                        value={alertChannelId ?? ""}
-                        onChange={(event) => {
-                          const selected = event.target.value
-                          setAlertChannelId(selected ? Number(selected) : undefined)
-                        }}
-                        disabled={!hasUsers || submitting}
+                        value={timezone}
+                        onChange={(e) => setTimezone(e.target.value)}
+                        disabled={submitting}
                       >
-                        <option value="">Personal reminder (user's topic only)</option>
-                        {alertChannels.map((channel) => (
-                          <option key={channel.id} value={channel.id}>
-                            {channel.name} (shared)
-                          </option>
+                        {timezoneOptions.map(tz => (
+                          <option key={tz.value} value={tz.value}>{tz.label}</option>
                         ))}
                       </select>
-                      <p className="text-xs text-slate-500 mt-1">
-                        Leave empty for personal reminders. Select a channel to send to multiple people.
-                      </p>
                     </div>
 
                     <div>
@@ -559,7 +665,7 @@ export default function Dashboard() {
                         value={title}
                         onChange={(event) => setTitle(event.target.value)}
                         required
-                        disabled={!hasUsers || submitting}
+                        disabled={!hasChannels || selectedChannelIds.length === 0 || submitting}
                       />
                     </div>
 
@@ -571,7 +677,7 @@ export default function Dashboard() {
                         rows={3}
                         value={body}
                         onChange={(event) => setBody(event.target.value)}
-                        disabled={!hasUsers || submitting}
+                        disabled={!hasChannels || selectedChannelIds.length === 0 || submitting}
                       />
                     </div>
 
@@ -689,29 +795,13 @@ export default function Dashboard() {
                           </select>
                         </div>
                       )}
-
-                      {/* Custom Cron Expression */}
-                      {selectedPattern === 'custom' && (
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-2">Cron Expression</label>
-                          <input
-                            type="text"
-                            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-mono shadow-sm transition focus:border-slate-400 focus:bg-white focus:outline-none"
-                            value={customCron}
-                            onChange={(e) => setCustomCron(e.target.value)}
-                            placeholder="0 9 * * *"
-                            required
-                          />
-                          <p className="text-xs text-slate-500 mt-1">Format: minute hour day month day-of-week</p>
-                        </div>
-                      )}
                     </div>
 
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <button
                         type="submit"
                         className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 disabled:cursor-not-allowed disabled:bg-slate-400"
-                        disabled={!hasUsers || submitting}
+                        disabled={!hasChannels || selectedChannelIds.length === 0 || submitting}
                       >
                         {submitting ? "Saving..." : "Save reminder"}
                       </button>
@@ -742,31 +832,22 @@ export default function Dashboard() {
 
                         <div>
                           <span className="text-sm font-medium text-slate-700">Schedule:</span>
-                          <p className="text-sm text-slate-900 mt-1">{getScheduleDescription()}</p>
+                          <p className="text-sm text-slate-900 mt-1">{getLocalScheduleDescription()}</p>
                         </div>
 
                         <div>
-                          <span className="text-sm font-medium text-slate-700">Cron Expression:</span>
-                          <p className="text-xs font-mono bg-white border rounded px-2 py-1 mt-1">
-                            {getCurrentCron() || <span className="text-slate-400">Will be generated</span>}
-                          </p>
-                        </div>
-
-                        <div>
-                          <span className="text-sm font-medium text-slate-700">User:</span>
+                          <span className="text-sm font-medium text-slate-700">Channels:</span>
                           <p className="text-sm text-slate-900 mt-1">
-                            {users.find(u => u.id === userId)?.name || <span className="text-slate-400">Select a user</span>}
-                          </p>
-                        </div>
-
-                        <div>
-                          <span className="text-sm font-medium text-slate-700">Destination:</span>
-                          <p className="text-sm text-slate-900 mt-1">
-                            {alertChannelId
-                              ? `${alertChannels.find(c => c.id === alertChannelId)?.name} (shared)`
-                              : "Personal (user's topic)"
+                            {selectedChannelIds.length > 0
+                              ? selectedChannelIds.map(id => channels.find(c => c.id === id)?.name).filter(Boolean).join(', ')
+                              : <span className="text-slate-400">Select channels</span>
                             }
                           </p>
+                        </div>
+
+                        <div>
+                          <span className="text-sm font-medium text-slate-700">Timezone:</span>
+                          <p className="text-sm text-slate-900 mt-1">{timezone}</p>
                         </div>
                       </div>
 
@@ -778,7 +859,6 @@ export default function Dashboard() {
                           <li>• Weekly: Select specific days of the week</li>
                           <li>• Monthly: Runs on the same day each month</li>
                           <li>• Yearly: Runs on the same date each year</li>
-                          <li>• Custom: Use cron syntax for advanced scheduling</li>
                         </ul>
                       </div>
                     </div>
@@ -824,18 +904,18 @@ export default function Dashboard() {
 
                 {/* Filter */}
                 <div className="mt-6">
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Filter by User</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Filter by Channel</label>
                   <select
                     className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-                    value={selectedUserId}
-                    onChange={(e) => setSelectedUserId(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+                    value={selectedChannelId}
+                    onChange={(e) => setSelectedChannelId(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
                   >
-                    <option value="all">All Users ({reminders.length} reminders)</option>
-                    {users.map(user => {
-                      const count = reminders.filter(r => r.user_id === user.id).length
+                    <option value="all">All Channels ({reminders.length} reminders)</option>
+                    {channels.map(channel => {
+                      const count = reminders.filter(r => r.channels.some(c => c.id === channel.id)).length
                       return (
-                        <option key={user.id} value={user.id}>
-                          {user.name} ({count} reminders)
+                        <option key={channel.id} value={channel.id}>
+                          {channel.name} ({count} reminders)
                         </option>
                       )
                     })}
@@ -864,9 +944,9 @@ export default function Dashboard() {
                 ) : filteredReminders.length === 0 ? (
                   <div className="rounded-lg bg-white p-8 text-center shadow-sm ring-1 ring-slate-200">
                     <p className="text-slate-600">
-                      {selectedUserId === 'all'
+                      {selectedChannelId === 'all'
                         ? "No reminders found. Create your first reminder to get started."
-                        : `No reminders found for ${getUserName(selectedUserId as number)}.`
+                        : `No reminders found for ${getChannelName(selectedChannelId as number)}.`
                       }
                     </p>
                   </div>
@@ -874,63 +954,90 @@ export default function Dashboard() {
                   <div className="grid gap-4">
                     {filteredReminders.map((reminder) => (
                       <div key={reminder.id} className="rounded-lg bg-white p-6 shadow-sm ring-1 ring-slate-200">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <h3 className="text-lg font-semibold text-slate-900">{reminder.title}</h3>
-                              <span className={`px-2 py-1 text-xs rounded-full ${
-                                reminder.enabled
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-gray-100 text-gray-800'
-                              }`}>
-                                {reminder.enabled ? 'Active' : 'Disabled'}
-                              </span>
+                        {editingReminder?.id === reminder.id ? (
+                          <EditReminderForm
+                            reminder={editingReminder}
+                            channels={channels}
+                            onSave={updateReminder}
+                            onCancel={() => {
+                              setEditingReminder(null)
+                              setEditingChannelIds([])
+                            }}
+                            submitting={submitting}
+                            setReminder={setEditingReminder}
+                            selectedChannelIds={editingChannelIds}
+                            setSelectedChannelIds={setEditingChannelIds}
+                          />
+                        ) : (
+                          <>
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <h3 className="text-lg font-semibold text-slate-900">{reminder.title}</h3>
+                                  <span className={`px-2 py-1 text-xs rounded-full ${
+                                    reminder.enabled
+                                      ? 'bg-green-100 text-green-800'
+                                      : 'bg-gray-100 text-gray-800'
+                                  }`}>
+                                    {reminder.enabled ? 'Active' : 'Disabled'}
+                                  </span>
+                                </div>
+                                
+                                {reminder.body && (
+                                  <p className="text-slate-600 mb-3">{reminder.body}</p>
+                                )}
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                                  <div>
+                                    <span className="text-slate-500">Channels:</span>
+                                    <p className="font-medium">
+                                      {reminder.channels.map(c => c.name).join(', ') || 'None'}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <span className="text-slate-500">Timezone:</span>
+                                    <p className="font-medium">{reminder.timezone}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-slate-500">Schedule:</span>
+                                    <p className="font-medium">{getScheduleDescription(parseCronToState(reminder.cron))}</p>
+                                  </div>
+                                  
+                                  <div>
+                                    <span className="text-slate-500">Created:</span>
+                                    <p>{reminder.created_at ? new Date(reminder.created_at).toLocaleDateString() : 'Recently'}</p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="text-xs text-slate-500">
+                                ID #{reminder.id}
+                              </div>
                             </div>
-                            
-                            {reminder.body && (
-                              <p className="text-slate-600 mb-3">{reminder.body}</p>
-                            )}
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                              <div>
-                                <span className="text-slate-500">Destination:</span>
-                                <p className="font-medium">
-                                  {reminder.alert_channel_id
-                                    ? `${alertChannels.find(c => c.id === reminder.alert_channel_id)?.name || 'Channel'} (shared)`
-                                    : `${getUserName(reminder.user_id)} (personal)`
-                                  }
-                                </p>
-                              </div>
-                              <div>
-                                <span className="text-slate-500">Schedule:</span>
-                                <p className="font-medium">{formatCronDescription(reminder.cron)}</p>
-                              </div>
-                              <div>
-                                <span className="text-slate-500">Cron:</span>
-                                <p className="font-mono text-xs bg-slate-100 px-2 py-1 rounded mt-1">
-                                  {reminder.cron}
-                                </p>
-                              </div>
-                              <div>
-                                <span className="text-slate-500">Created:</span>
-                                <p>{reminder.created_at ? new Date(reminder.created_at).toLocaleDateString() : 'Recently'}</p>
-                              </div>
+                            <div className="mt-4 pt-3 border-t border-slate-200 flex flex-wrap gap-3">
+                              <button
+                                onClick={() => startEditing(reminder)}
+                                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => toggleEnabled(reminder)}
+                                className="text-sm text-orange-600 hover:text-orange-800 font-medium"
+                              >
+                                {reminder.enabled ? 'Disable' : 'Enable'}
+                              </button>
+                              <button
+                                onClick={() => deleteReminder(reminder.id)}
+                                disabled={deleting === reminder.id}
+                                className="text-sm text-red-600 hover:text-red-800 font-medium disabled:opacity-50"
+                              >
+                                {deleting === reminder.id ? "Deleting..." : "Delete"}
+                              </button>
                             </div>
-                          </div>
-
-                          <div className="text-xs text-slate-500">
-                            ID #{reminder.id}
-                          </div>
-                        </div>
-
-                        <div className="mt-4 pt-3 border-t border-slate-200">
-                          <Link
-                            href="/reminders"
-                            className="text-sm text-blue-600 hover:text-blue-800"
-                          >
-                            Manage this reminder →
-                          </Link>
-                        </div>
+                          </>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -942,7 +1049,7 @@ export default function Dashboard() {
                       href="/reminders"
                       className="inline-flex items-center justify-center rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-200"
                     >
-                      View full reminders page for editing
+                      View delivery logs →
                     </Link>
                   </div>
                 )}

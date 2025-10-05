@@ -15,13 +15,9 @@ const pathToBreadcrumbs: Record<string, BreadcrumbItem[]> = {
     { label: "Home", href: "/" },
     { label: "Dashboard", href: "/dashboard" }
   ],
-  "/users": [
+  "/channels": [
     { label: "Home", href: "/" },
-    { label: "Manage Users", href: "/users" }
-  ],
-  "/alert-channels": [
-    { label: "Home", href: "/" },
-    { label: "Alert Channels", href: "/alert-channels" }
+    { label: "Channels", href: "/channels" }
   ],
   "/reminders": [
     { label: "Home", href: "/" },

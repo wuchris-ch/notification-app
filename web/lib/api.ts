@@ -54,6 +54,28 @@ export function apiUrl(path: string): string {
 }
 
 // Types
+export interface Channel {
+  id: number
+  name: string
+  description?: string
+  ntfy_topic: string
+  timezone: string
+  enabled: boolean
+  created_at: string
+}
+
+export interface Reminder {
+  id: number
+  title: string
+  body?: string
+  cron: string
+  timezone: string
+  enabled: boolean
+  created_at?: string
+  channels: Channel[]
+}
+
+// Legacy types (deprecated - for backward compatibility during migration)
 export interface User {
   id: number
   name: string
@@ -68,17 +90,6 @@ export interface AlertChannel {
   ntfy_topic: string
   enabled: boolean
   created_at: string
-}
-
-export interface Reminder {
-  id: number
-  user_id: number
-  alert_channel_id?: number
-  title: string
-  body?: string
-  cron: string
-  enabled: boolean
-  created_at?: string
 }
 
 export interface DeliveryLog {
@@ -107,72 +118,104 @@ async function fetchApi(endpoint: string, options?: RequestInit) {
   return response.json()
 }
 
-// Users API
+// Channels API (replaces both Users and AlertChannels)
+export const channelsApi = {
+  list: (): Promise<Channel[]> => fetchApi('/api/channels'),
+  
+  get: (id: number): Promise<Channel> => fetchApi(`/api/channels/${id}`),
+  
+  create: (data: Omit<Channel, 'id' | 'enabled' | 'created_at'>): Promise<Channel> =>
+    fetchApi('/api/channels', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
+  update: (id: number, data: Partial<Omit<Channel, 'id' | 'created_at'>>): Promise<Channel> =>
+    fetchApi(`/api/channels/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  
+  delete: (id: number): Promise<{ detail: string }> =>
+    fetchApi(`/api/channels/${id}`, { method: 'DELETE' }),
+}
+
+// Legacy Users API (deprecated - use channelsApi instead)
 export const usersApi = {
   list: (): Promise<User[]> => fetchApi('/users'),
   
   get: (id: number): Promise<User> => fetchApi(`/users/${id}`),
   
-  create: (data: Omit<User, 'id'>): Promise<User> => 
+  create: (data: Omit<User, 'id'>): Promise<User> =>
     fetchApi('/users', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
   
-  update: (id: number, data: Partial<Omit<User, 'id'>>): Promise<User> => 
+  update: (id: number, data: Partial<Omit<User, 'id'>>): Promise<User> =>
     fetchApi(`/users/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
   
-  delete: (id: number): Promise<{ detail: string }> => 
+  delete: (id: number): Promise<{ detail: string }> =>
     fetchApi(`/users/${id}`, { method: 'DELETE' }),
 }
 
 // Reminders API
 export const remindersApi = {
-  list: (userId?: number): Promise<Reminder[]> => {
-    const params = userId ? `?user_id=${userId}` : ''
-    return fetchApi(`/reminders${params}`)
-  },
+  list: (): Promise<Reminder[]> => fetchApi('/api/reminders'),
   
-  get: (id: number): Promise<Reminder> => fetchApi(`/reminders/${id}`),
+  get: (id: number): Promise<Reminder> => fetchApi(`/api/reminders/${id}`),
   
-  create: (data: Omit<Reminder, 'id' | 'enabled' | 'created_at'>): Promise<Reminder> => 
-    fetchApi('/reminders', {
+  create: (data: {
+    title: string
+    body?: string
+    cron: string
+    timezone: string
+    channel_ids: number[]
+  }): Promise<Reminder> =>
+    fetchApi('/api/reminders', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
   
-  update: (id: number, data: Partial<Omit<Reminder, 'id' | 'created_at'>>): Promise<Reminder> => 
-    fetchApi(`/reminders/${id}`, {
+  update: (id: number, data: Partial<{
+    title: string
+    body?: string
+    cron: string
+    timezone: string
+    channel_ids: number[]
+    enabled: boolean
+  }>): Promise<Reminder> =>
+    fetchApi(`/api/reminders/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
   
-  delete: (id: number): Promise<{ detail: string }> => 
-    fetchApi(`/reminders/${id}`, { method: 'DELETE' }),
+  delete: (id: number): Promise<{ detail: string }> =>
+    fetchApi(`/api/reminders/${id}`, { method: 'DELETE' }),
 }
 
-// Alert Channels API
+// Legacy Alert Channels API (deprecated - use channelsApi instead)
 export const alertChannelsApi = {
   list: (): Promise<AlertChannel[]> => fetchApi('/alert-channels'),
   
   get: (id: number): Promise<AlertChannel> => fetchApi(`/alert-channels/${id}`),
   
-  create: (data: Omit<AlertChannel, 'id' | 'enabled' | 'created_at'>): Promise<AlertChannel> => 
+  create: (data: Omit<AlertChannel, 'id' | 'enabled' | 'created_at'>): Promise<AlertChannel> =>
     fetchApi('/alert-channels', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
   
-  update: (id: number, data: Partial<Omit<AlertChannel, 'id' | 'created_at'>>): Promise<AlertChannel> => 
+  update: (id: number, data: Partial<Omit<AlertChannel, 'id' | 'created_at'>>): Promise<AlertChannel> =>
     fetchApi(`/alert-channels/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
   
-  delete: (id: number): Promise<{ detail: string }> => 
+  delete: (id: number): Promise<{ detail: string }> =>
     fetchApi(`/alert-channels/${id}`, { method: 'DELETE' }),
 }
 
@@ -188,16 +231,16 @@ export const logsApi = {
 }
 
 // Test notification
-export const testNotification = (userId: number, title: string, body?: string): Promise<{ ok: boolean }> =>
-  fetchApi('/notifications/test', {
+export const testNotification = (channelId: number, title: string, body?: string): Promise<{ ok: boolean }> =>
+  fetchApi('/api/notifications/test', {
     method: 'POST',
-    body: JSON.stringify({ user_id: userId, title, body }),
+    body: JSON.stringify({ channel_id: channelId, title, body }),
   })
 
 // AI-powered reminder types
 export interface AIReminderInput {
-  user_id: number
-  alert_channel_id?: number
+  channel_ids: number[]
+  timezone: string
   natural_language: string
 }
 
@@ -213,13 +256,13 @@ export interface AIReminderParsed {
 // AI-powered reminder API
 export const aiRemindersApi = {
   parse: (data: AIReminderInput): Promise<AIReminderParsed> =>
-    fetchApi('/reminders/ai/parse', {
+    fetchApi('/api/reminders/ai/parse', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
   
   create: (data: AIReminderInput): Promise<Reminder> =>
-    fetchApi('/reminders/ai/create', {
+    fetchApi('/api/reminders/ai/create', {
       method: 'POST',
       body: JSON.stringify(data),
     }),

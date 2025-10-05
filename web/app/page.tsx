@@ -26,52 +26,24 @@ export default function Home() {
             <CardHeader>
               <div className="flex items-center space-x-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <Users className="h-4 w-4" />
-                </div>
-                <div>
-                  <CardTitle>Manage Users</CardTitle>
-                  <CardDescription>
-                    Add and organize family members
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                Add, edit, and organize family members who will receive reminders. 
-                Set up profiles and preferences for each family member.
-              </p>
-              <Button asChild className="w-full">
-                <Link href="/users">
-                  Manage Users
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <div className="flex items-center space-x-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-600 text-white">
                   <Bell className="h-4 w-4" />
                 </div>
                 <div>
-                  <CardTitle>Alert Channels</CardTitle>
+                  <CardTitle>Manage Channels</CardTitle>
                   <CardDescription>
-                    Configure notification methods
+                    Configure notification destinations
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground mb-4">
-                Set up notification channels like email, SMS, or push notifications. 
-                Customize how and when your family receives alerts.
+                Create and manage notification channels for individuals or groups.
+                Each channel represents a destination for reminders.
               </p>
               <Button asChild className="w-full">
-                <Link href="/alert-channels">
-                  Setup Alerts
+                <Link href="/channels">
+                  Manage Channels
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
