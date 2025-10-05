@@ -394,7 +394,7 @@ export default function Dashboard() {
               <header className="mb-8">
                 <h1 className="text-3xl font-semibold text-slate-900 mb-2">Create Reminder</h1>
                 <p className="text-sm text-slate-600">
-                  Fill in who should receive it, what the reminder says, and when it should go out.
+                  Choose who receives it, what it says, and when it goes out. Leave alert channel empty for personal reminders.
                 </p>
               </header>
 
@@ -526,6 +526,29 @@ export default function Dashboard() {
                           </option>
                         ))}
                       </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Alert Channel (Optional)</label>
+                      <select
+                        className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm shadow-sm transition focus:border-slate-400 focus:bg-white focus:outline-none"
+                        value={alertChannelId ?? ""}
+                        onChange={(event) => {
+                          const selected = event.target.value
+                          setAlertChannelId(selected ? Number(selected) : undefined)
+                        }}
+                        disabled={!hasUsers || submitting}
+                      >
+                        <option value="">Personal reminder (user's topic only)</option>
+                        {alertChannels.map((channel) => (
+                          <option key={channel.id} value={channel.id}>
+                            {channel.name} (shared)
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Leave empty for personal reminders. Select a channel to send to multiple people.
+                      </p>
                     </div>
 
                     <div>
@@ -737,11 +760,11 @@ export default function Dashboard() {
                         </div>
 
                         <div>
-                          <span className="text-sm font-medium text-slate-700">Alert Channel:</span>
+                          <span className="text-sm font-medium text-slate-700">Destination:</span>
                           <p className="text-sm text-slate-900 mt-1">
                             {alertChannelId
-                              ? alertChannels.find(c => c.id === alertChannelId)?.name
-                              : "User's personal topic"
+                              ? `${alertChannels.find(c => c.id === alertChannelId)?.name} (shared)`
+                              : "Personal (user's topic)"
                             }
                           </p>
                         </div>
@@ -870,8 +893,13 @@ export default function Dashboard() {
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                               <div>
-                                <span className="text-slate-500">User:</span>
-                                <p className="font-medium">{getUserName(reminder.user_id)}</p>
+                                <span className="text-slate-500">Destination:</span>
+                                <p className="font-medium">
+                                  {reminder.alert_channel_id
+                                    ? `${alertChannels.find(c => c.id === reminder.alert_channel_id)?.name || 'Channel'} (shared)`
+                                    : `${getUserName(reminder.user_id)} (personal)`
+                                  }
+                                </p>
                               </div>
                               <div>
                                 <span className="text-slate-500">Schedule:</span>

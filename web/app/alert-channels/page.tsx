@@ -196,8 +196,11 @@ export default function AlertChannels() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-semibold text-slate-900">Alert Channels</h1>
-            <p className="text-sm text-slate-600">
-              Create notification channels that reminders can be assigned to. Channels allow multiple reminders to share the same notification destination.
+            <p className="text-sm text-slate-600 mt-1">
+              Create shared notification channels for group reminders. For example, create a "Family Group" channel that everyone subscribes to for family-wide notifications.
+            </p>
+            <p className="text-xs text-slate-500 mt-2">
+              💡 <strong>Tip:</strong> Personal reminders automatically use each user's individual topic. Use alert channels when you want the same notification to go to multiple people.
             </p>
           </div>
           <div className="flex gap-2">
@@ -218,8 +221,11 @@ export default function AlertChannels() {
 
         {/* Create Form */}
         {showCreateForm && (
-          <div className="mt-6 p-4 bg-slate-50 rounded-lg">
-            <h3 className="font-medium text-slate-900 mb-4">Create New Alert Channel</h3>
+          <div className="mt-6 p-4 bg-slate-50 rounded-lg border-2 border-blue-100">
+            <h3 className="font-medium text-slate-900 mb-2">Create New Alert Channel</h3>
+            <p className="text-xs text-slate-600 mb-4">
+              This creates a shared notification topic. Everyone who wants to receive these notifications should subscribe to this topic on their ntfy app.
+            </p>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Channel Name</label>
@@ -229,6 +235,7 @@ export default function AlertChannels() {
                   onChange={(e) => setNewChannelName(e.target.value)}
                   placeholder="Family Group"
                 />
+                <p className="text-xs text-slate-500 mt-1">e.g., "Family Group", "Parents Only"</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">NTFY Topic</label>
@@ -236,8 +243,9 @@ export default function AlertChannels() {
                   className="w-full rounded border border-slate-200 px-3 py-2 text-sm font-mono"
                   value={newChannelTopic}
                   onChange={(e) => setNewChannelTopic(e.target.value)}
-                  placeholder="family-group"
+                  placeholder="family-all"
                 />
+                <p className="text-xs text-slate-500 mt-1">Everyone subscribes to this on their phone</p>
               </div>
             </div>
             <div className="mt-4">
@@ -285,7 +293,8 @@ export default function AlertChannels() {
         {channels.length === 0 ? (
           <div className="rounded-lg bg-white p-8 text-center shadow-sm ring-1 ring-slate-200">
             <p className="text-slate-600 mb-2">No alert channels created yet.</p>
-            <p className="text-sm text-slate-500">Create your first alert channel to group notifications.</p>
+            <p className="text-sm text-slate-500 mb-3">Create shared channels for group notifications (e.g., "Family Group" for everyone, "Parents Only" for specific people).</p>
+            <p className="text-xs text-slate-400">Personal reminders will automatically use each user's individual topic.</p>
             <button
               onClick={() => setShowCreateForm(true)}
               className="mt-3 inline-block px-4 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800"

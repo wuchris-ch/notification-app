@@ -232,9 +232,12 @@ export default function Users() {
       <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 sm:p-8">
         <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold text-slate-900">Family members</h1>
-            <p className="text-sm text-slate-600">
-              Add each person who should receive reminders. You can always come back to edit later.
+            <h1 className="text-3xl font-semibold text-slate-900">Family Members</h1>
+            <p className="text-sm text-slate-600 mt-1">
+              Add each person who should receive reminders. Each person gets their own personal notification topic.
+            </p>
+            <p className="text-xs text-slate-500 mt-2">
+              💡 <strong>Tip:</strong> Each person subscribes to their personal topic on their phone (e.g., "family-mom"). For group notifications, create an Alert Channel that multiple people can subscribe to.
             </p>
           </div>
           <button
@@ -260,7 +263,7 @@ export default function Users() {
               />
             </label>
             <label className="space-y-1">
-              <span className="text-sm font-medium text-slate-700">ntfy topic</span>
+              <span className="text-sm font-medium text-slate-700">Personal ntfy topic</span>
               <input
                 className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm shadow-sm transition focus:border-slate-400 focus:bg-white focus:outline-none"
                 placeholder="family-alex"
@@ -272,7 +275,7 @@ export default function Users() {
                 required
               />
               <p className="text-xs text-slate-500">
-                This must match the topic subscribed on their phone. We&apos;ll suggest one from the name, but you can edit it.
+                This person subscribes to this topic on their ntfy app to receive personal reminders. We&apos;ll suggest one from their name.
               </p>
             </label>
           </div>
@@ -311,7 +314,7 @@ export default function Users() {
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-slate-500">All reminders for this person will use their timezone automatically.</p>
+            <p className="text-xs text-slate-500">Personal reminders will be sent to their topic. Their timezone is used for scheduling all their reminders.</p>
             <button
               type="submit"
               className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 disabled:cursor-not-allowed disabled:bg-slate-400"
@@ -336,7 +339,7 @@ export default function Users() {
           <p className="rounded-lg bg-white p-4 text-sm text-slate-600 shadow-sm ring-1 ring-slate-200">Loading users...</p>
         ) : users.length === 0 ? (
           <p className="rounded-lg bg-white p-4 text-sm text-slate-600 shadow-sm ring-1 ring-slate-200">
-            No users yet. Add your first person above to start scheduling reminders.
+            No users yet. Add your first family member above. Each person will get their own personal notification topic for individual reminders.
           </p>
         ) : (
           <ul className="grid gap-4 sm:grid-cols-2">
@@ -361,8 +364,9 @@ export default function Users() {
                       <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">ID #{user.id}</span>
                     </div>
                     <div className="mt-3 text-sm text-slate-600">
-                      ntfy topic:
+                      Personal topic:
                       <code className="ml-1 rounded bg-slate-100 px-1 py-0.5 text-xs text-slate-700">{user.ntfy_topic}</code>
+                      <p className="text-xs text-slate-500 mt-1">Subscribe to this on the ntfy app</p>
                     </div>
                     <div className="mt-4 flex gap-2">
                       <button

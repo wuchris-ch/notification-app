@@ -34,17 +34,20 @@ function EditReminderForm({ reminder, users, alertChannels, onSave, onCancel, su
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-700 mb-1">Alert Channel</label>
+        <label className="block text-xs font-medium text-slate-700 mb-1">Alert Channel (Optional)</label>
         <select
           className="w-full rounded border border-slate-200 px-2 py-1 text-sm"
           value={reminder.alert_channel_id || ''}
           onChange={(e) => updateField('alert_channel_id', e.target.value ? parseInt(e.target.value) : undefined)}
         >
-          <option value="">Use user's personal topic</option>
+          <option value="">Personal reminder (user's topic only)</option>
           {alertChannels.map(channel => (
-            <option key={channel.id} value={channel.id}>{channel.name}</option>
+            <option key={channel.id} value={channel.id}>{channel.name} (shared)</option>
           ))}
         </select>
+        <p className="text-xs text-slate-500 mt-1">
+          Leave empty for personal reminders. Select a channel to send to multiple people.
+        </p>
       </div>
       <div>
         <label className="block text-xs font-medium text-slate-700 mb-1">Title</label>
@@ -217,8 +220,9 @@ export default function Reminders() {
   }
 
   const getChannelName = (channelId?: number) => {
-    if (!channelId) return "User's personal topic"
-    return alertChannels.find(c => c.id === channelId)?.name || `Channel ${channelId}`
+    if (!channelId) return "Personal (user's topic)"
+    const channel = alertChannels.find(c => c.id === channelId)
+    return channel ? `${channel.name} (shared)` : `Channel ${channelId}`
   }
 
   if (loading) {
@@ -344,7 +348,7 @@ export default function Reminders() {
                             <p className="font-medium">{getUserName(reminder.user_id)}</p>
                           </div>
                           <div>
-                            <span className="text-slate-500">Alert Channel:</span>
+                            <span className="text-slate-500">Destination:</span>
                             <p className="font-medium">{getChannelName(reminder.alert_channel_id)}</p>
                           </div>
                           <div>
